@@ -180,13 +180,14 @@
                                                       ?states)))))
 
 (defrule update-pixels:dead
-         (stage (current update-pixels))
+         (stage (current update-pixel))
          (object (is-a cell)
                  (x ?x)
                  (y ?y)
                  (state dead))
          =>
-         (unicornhat:set-pixel-color ?x ?y (create$ 0 0 0)))
+         (unicornhat:set-pixel-color (unicornhat:get-pixel-position ?x ?y)
+                                     0 0 0))
 (defrule update-pixels:alive
          (stage (current update-pixel))
          (object (is-a cell)
@@ -194,7 +195,8 @@
                  (y ?y)
                  (state alive))
          =>
-         (unicornhat:set-pixel-color ?x ?y (create$ 128 0 128)))
+         (unicornhat:set-pixel-color (unicornhat:get-pixel-position ?x ?y)
+                                     128 0 128))
 
 (defrule draw
          (stage (current draw))
@@ -216,7 +218,8 @@
 (defrule update-pixel:keep-alive
          (declare (salience 1))
          (stage (current rules))
-         ?f <- (neighbor-results (num-alive ?number&:(not (<> ?number 2 3)))
+         ?f <- (neighbor-results (num-alive ?number&:(or (= ?number 2)
+                                                         (= ?number 3)))
                                  (target ?cell))
          (object (is-a cell)
                  (name ?cell)
@@ -253,14 +256,16 @@
          ?f <- (neighbor-results)
          =>
          (retract ?f))
+
 (defrule restart-process
          ?f <- (stage (current restart)
                       (rest $?rest))
          =>
-         (modify ?f (current (expand$ (first$ ?*stages*)))
-                 (rest (rest$ ?*stages*) ?rest)))
-
-
+         (bind ?new-stage (expand$ (first$ ?*stages*)))
+         (bind ?contents (create$ (rest$ ?*stages*)
+                                  ?rest))
+         (modify ?f (current ?new-stage)
+                 (rest ?contents)))
 
 
 (defrule startup
@@ -270,8 +275,9 @@
          (retract ?f)
          (undeffacts ?deffacts)
          (unicornhat:set-brightness 50)
-         (unicornhat:clear)
-         (assert (stage (current (first$ ?*stages*))
-                        (rest (rest$ ?*stages*)))))
-
-
+         (loop-for-count (?a 0 63) do
+          (unicornhat:set-pixel-color ?a 0 0 0))
+         (bind ?target (expand$ (first$ ?*stages*)))
+         (bind ?rest (rest$ ?*stages*))
+         (assert (stage (current ?target)
+                        (rest ?rest))))
