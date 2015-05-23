@@ -30,6 +30,9 @@
             "Gets the next cell with wraparound ")
 (defgeneric n-1
             "Gets the previous cell with wraparound")
+(defgeneric count$
+            "applies a function to a multifield and counts how many times TRUE is returned")
+
 
 (defmethod n+1
   ((?n INTEGER (<= 0 (+ ?n 1) 7)))
@@ -49,6 +52,19 @@
 (defmethod n-1
   ((?n INTEGER (< (- ?n 1) 0)))
   7)
+(defmethod count$
+  ((?fn SYMBOL)
+   (?elements MULTIFIELD))
+  (bind ?count 0)
+  (progn$ (?e ?elements)
+          (if (funcall ?fn ?e) then
+            (bind ?count (+ ?count 1))))
+  (return ?count))
+(defmethod count$
+  ((?fn SYMBOL)
+   $?elements)
+  (count$ ?fn ?elements))
+
 (defclass cell
   (is-a USER)
   (slot status
@@ -152,4 +168,73 @@
               (of cell (x 7) (y 7))
               )
 
-(defmessage-handler
+(defglobal MAIN
+           ?*cell-dies* = (create$ 0 1 4 5 6 7 8)
+           ?*cell-spawns* = (create$ 3)
+           ?*cell-lives* = (create$ 2 3))
+(deftemplate neighbor-results
+             (slot target
+                   (default ?NONE))
+             (slot num-dead
+                   (type INTEGER)
+                   (default ?NONE))
+             (slot num-alive
+                   (type INTEGER)
+                   (default ?NONE)))
+(deffunction is-dead
+             (?symbol)
+             (eq ?symbol dead))
+(deffunction is-alive
+             (?symbol)
+             (eq ?symbol alive))
+(defrule get-neighbors
+         (stage (current generate-update))
+         (object (is-a board)
+                 (x ?x)
+                 (y ?y)
+                 (name ?cell0))
+         (object (is-a board)
+                 (x ?x)
+                 (y =(n+1 ?y))
+                 (state ?state1))
+         (object (is-a board)
+                 (x ?x)
+                 (y =(n-1 ?y))
+                 (state ?state2))
+         (object (is-a board)
+                 (x =(n+1 ?x))
+                 (y ?y)
+                 (state ?state3))
+         (object (is-a board)
+                 (x =(n+1 ?x))
+                 (y =(n+1 ?y))
+                 (state ?state4))
+         (object (is-a board)
+                 (x =(n+1 ?x))
+                 (y =(n-1 ?y))
+                 (state ?state5))
+         (object (is-a board)
+                 (x =(n-1 ?x))
+                 (y ?y)
+                 (state ?state6))
+         (object (is-a board)
+                 (x =(n-1 ?x))
+                 (y =(n+1 ?y))
+                 (state ?state7))
+         (object (is-a board)
+                 (x =(n-1 ?x))
+                 (y =(n-1 ?y))
+                 (state ?state8))
+         =>
+         (bind ?states (create$ ?state1 
+                                ?state2 
+                                ?state3 
+                                ?state4 
+                                ?state5 
+                                ?state6 
+                                ?state7 
+                                ?state8))
+         (assert (neighbor-results (target ?cell0)
+                                   (num-dead (count$ is-dead ?states))
+                                   (num-alive (count$ is-alive ?states)))))
+
