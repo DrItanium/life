@@ -33,17 +33,11 @@
   (loop-for-count (?x 0 7) do
                   (loop-for-count (?y 0 7) do
                                   (bind ?result (read ?infile))
-                                  (if (neq ?result EOF) then
-                                    (format ?outfile 
-                                            "(of cell (x %d) (y %d) (state %s))%n"
-                                            ?x
-                                            ?y
-                                            (if (eq ?result +) then
-                                              alive
-                                              else
-                                              dead))
-                                    else
-                                    (return FALSE))))
+                                  (format ?outfile 
+                                          "(of cell (x %d) (y %d) (state %s))%n"
+                                          ?x
+                                          ?y
+                                          (if (eq ?result +) then alive else dead))))
   (printout ?outfile ")" crlf)
   (return TRUE))
 (defmethod generate-board
