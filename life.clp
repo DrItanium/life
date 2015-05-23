@@ -32,6 +32,7 @@
            ?*stages* = (create$ update-pixel
                                 draw
                                 wait
+                                perhaps-terminate
                                 generate-update
                                 rules
                                 restart))
@@ -267,7 +268,12 @@
          (modify ?f (current ?new-stage)
                  (rest ?contents)))
 
-
+(defrule terminate
+         ?f <- (stage (current perhaps-terminate))
+         (not (exists (object (is-a cell) 
+                              (state alive))))
+         =>
+         (retract ?f))
 (defrule startup
          (declare (salience 10000))
          ?f <- (initialize ?deffacts)
