@@ -276,7 +276,7 @@
          (undeffacts ?deffacts)
          (unicornhat:set-brightness 50)
          (loop-for-count (?a 0 63) do
-          (unicornhat:set-pixel-color ?a 0 0 0))
+                         (unicornhat:set-pixel-color ?a 0 0 0))
          (bind ?target (expand$ (first$ ?*stages*)))
          (bind ?rest (rest$ ?*stages*))
          (assert (stage (current ?target)
