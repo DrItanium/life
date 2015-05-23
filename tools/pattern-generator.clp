@@ -44,6 +44,7 @@
                                               dead))
                                     else
                                     (return FALSE))))
+  (printout ?outfile ")" crlf)
   (return TRUE))
 (defmethod generate-board
   ((?board-name SYMBOL)
