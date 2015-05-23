@@ -26,6 +26,15 @@
 ; either expressed or implied, of the FreeBSD Project.(
 
 ; life.clp - implements conway's game of life to be played on the unicornhat
+(deffacts initialize-startup
+          (initialize initialize-startup))
+(defglobal MAIN
+           ?*stages* = (create$ update-pixel
+                                draw
+                                wait
+                                generate-update
+                                rules
+                                restart))
 (defgeneric n+1 
             "Gets the next cell with wraparound ")
 (defgeneric n-1
@@ -67,7 +76,7 @@
 
 (defclass cell
   (is-a USER)
-  (slot status
+  (slot state 
         (type SYMBOL)
         (allowed-symbols dead
                          alive))
@@ -168,10 +177,6 @@
               (of cell (x 7) (y 7))
               )
 
-(defglobal MAIN
-           ?*cell-dies* = (create$ 0 1 4 5 6 7 8)
-           ?*cell-spawns* = (create$ 3)
-           ?*cell-lives* = (create$ 2 3))
 (deftemplate neighbor-results
              (slot target
                    (default ?NONE))
@@ -189,39 +194,39 @@
              (eq ?symbol alive))
 (defrule get-neighbors
          (stage (current generate-update))
-         (object (is-a board)
+         (object (is-a cell)
                  (x ?x)
                  (y ?y)
                  (name ?cell0))
-         (object (is-a board)
+         (object (is-a cell)
                  (x ?x)
                  (y =(n+1 ?y))
                  (state ?state1))
-         (object (is-a board)
+         (object (is-a cell)
                  (x ?x)
                  (y =(n-1 ?y))
                  (state ?state2))
-         (object (is-a board)
+         (object (is-a cell)
                  (x =(n+1 ?x))
                  (y ?y)
                  (state ?state3))
-         (object (is-a board)
+         (object (is-a cell)
                  (x =(n+1 ?x))
                  (y =(n+1 ?y))
                  (state ?state4))
-         (object (is-a board)
+         (object (is-a cell)
                  (x =(n+1 ?x))
                  (y =(n-1 ?y))
                  (state ?state5))
-         (object (is-a board)
+         (object (is-a cell)
                  (x =(n-1 ?x))
                  (y ?y)
                  (state ?state6))
-         (object (is-a board)
+         (object (is-a cell)
                  (x =(n-1 ?x))
                  (y =(n+1 ?y))
                  (state ?state7))
-         (object (is-a board)
+         (object (is-a cell)
                  (x =(n-1 ?x))
                  (y =(n-1 ?y))
                  (state ?state8))
@@ -235,6 +240,104 @@
                                 ?state7 
                                 ?state8))
          (assert (neighbor-results (target ?cell0)
-                                   (num-dead (count$ is-dead ?states))
-                                   (num-alive (count$ is-alive ?states)))))
+                                   (num-dead (count$ is-dead 
+                                                     ?states))
+                                   (num-alive (count$ is-alive 
+                                                      ?states)))))
+
+(defrule update-pixels:dead
+         (stage (current update-pixels))
+         (object (is-a cell)
+                 (x ?x)
+                 (y ?y)
+                 (state dead))
+         =>
+         (unicornhat:set-pixel-color ?x ?y (create$ 0 0 0)))
+(defrule update-pixels:alive
+         (stage (current update-pixel))
+         (object (is-a cell)
+                 (x ?x)
+                 (y ?y)
+                 (state alive))
+         =>
+         (unicornhat:set-pixel-color ?x ?y (create$ 128 0 128)))
+
+(defrule draw
+         (stage (current draw))
+         =>
+         (unicornhat:show))
+
+(defrule update-pixel:underpopulation
+         (declare (salience 1))
+         (stage (current rules))
+         ?f <- (neighbor-results (num-alive ?na&:(< ?na 2))
+                                 (target ?cell))
+         (object (is-a cell)
+                 (name ?cell)
+                 (state alive))
+         =>
+         (retract ?f)
+         (modify-instance ?cell 
+                          (state dead)))
+(defrule update-pixel:keep-alive
+         (declare (salience 1))
+         (stage (current rules))
+         ?f <- (neighbor-results (num-alive ?number&:(not (<> ?number 2 3)))
+                                 (target ?cell))
+         (object (is-a cell)
+                 (name ?cell)
+                 (state alive))
+         =>
+         (retract ?f))
+
+(defrule update-pixel:overpopulation
+         (declare (salience 1))
+         (stage (current rules))
+         ?f <- (neighbor-results (num-alive ?number&:(> ?number 3))
+                                 (target ?cell))
+         (object (is-a cell)
+                 (name ?cell)
+                 (state alive))
+         =>
+         (retract ?f)
+         (modify-instance ?cell (state dead)))
+
+(defrule update-pixel:resurrection
+         (declare (salience 1))
+         (stage (current rules))
+         ?f <- (neighbor-results (num-alive ?number&:(= ?number 3))
+                                 (target ?cell))
+         (object (is-a cell)
+                 (name ?cell)
+                 (state dead))
+         =>
+         (retract ?f)
+         (modify-instance ?cell (state alive)))
+
+(defrule update-pixel:do-nothing
+         (stage (current rules))
+         ?f <- (neighbor-results)
+         =>
+         (retract ?f))
+(defrule restart-process
+         ?f <- (stage (current restart)
+                      (rest $?rest))
+         =>
+         (modify ?f (current (expand$ (first$ ?*stages*)))
+                 (rest (rest$ ?*stages*) ?rest)))
+
+
+
+
+(defrule startup
+         (declare (salience 10000))
+         ?f <- (initialize ?deffacts)
+         =>
+         (retract ?f)
+         (undeffacts ?deffacts)
+         (unicornhat:set-brightness 50)
+         (unicornhat:clear)
+         (assert (stage (current (first$ ?*stages*))
+                        (rest (rest$ ?*stages*)))))
+
 
