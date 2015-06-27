@@ -254,6 +254,14 @@
          ; has to be done this way since sequence operators aren't valid in assertions
          (loop-for-count (?x ?*board-min* ?*board-max*) do
                          (loop-for-count (?y ?*board-min* ?*board-max*) do
+                                         (bind ?xm (n-1 ?x))
+                                         (bind ?xp (n+1 ?x))
+                                         (bind ?ym (n-1 ?y))
+                                         (bind ?yp (n+1 ?y))
+                                         ; generate the values that make up the neighbors
+                                         (assert (compute-neighbors ?x ?y
+                                                                    ?xm ?ym
+                                                                    ?xp ?yp))
                                          (make-instance of cell 
                                                         (x ?x) 
                                                         (y ?y) 
@@ -276,39 +284,43 @@
          ?c <- (object (is-a cell)
                        (x ?x)
                        (y ?y))
+         ?q <- (compute-neighbors ?x ?y 
+                                  ?xm ?ym
+                                  ?xp ?yp)
          (object (is-a cell)
                  (x ?x)
-                 (y =(n+1 ?y))
+                 (y ?yp)
                  (name ?cell1))
          (object (is-a cell)
                  (x ?x)
-                 (y =(n-1 ?y))
+                 (y ?ym)
                  (name ?cell2))
          (object (is-a cell)
-                 (x =(n+1 ?x))
+                 (x ?xp)
                  (y ?y)
                  (name ?cell3))
          (object (is-a cell)
-                 (x =(n+1 ?x))
-                 (y =(n+1 ?y))
+                 (x ?xp)
+                 (y ?yp)
                  (name ?cell4))
          (object (is-a cell)
-                 (x =(n+1 ?x))
-                 (y =(n-1 ?y))
+                 (x ?xp)
+                 (y ?ym)
                  (name ?cell5))
          (object (is-a cell)
-                 (x =(n-1 ?x))
+                 (x ?xm)
                  (y ?y)
                  (name ?cell6))
          (object (is-a cell)
-                 (x =(n-1 ?x))
-                 (y =(n+1 ?y))
+                 (x ?xm)
+                 (y ?yp)
                  (name ?cell7))
          (object (is-a cell)
-                 (x =(n-1 ?x))
-                 (y =(n-1 ?y))
+                 (x ?xm)
+                 (y ?ym)
                  (name ?cell8))
          =>
+         (retract ?q)
          (modify-instance ?c (neighbors ?cell1 
                                         ?cell2 
                                         ?cell3 
