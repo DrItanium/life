@@ -36,6 +36,9 @@
                                 generate-update
                                 rules
                                 restart)
+           ; r g b
+           ?*dead-pixel* = (create$ 0 0 0)
+           ?*live-pixel* = (create$ 128 0 128)
            ?*display-min* = 0
            ?*display-max* = 7
            ?*board-min* = -10
@@ -96,17 +99,24 @@
         (default ?NONE))
   (multislot neighbors
              (type INSTANCE)
-             (allowed-classes cell)))
+             (allowed-classes cell))
+  (message-handler is-dead primary)
+  (message-handler is-alive primary))
 
-(deftemplate pattern-cell
-             (slot x
-                   (type INTEGER)
-                   (range 0 7)
-                   (default ?NONE))
-             (slot y
-                   (type INTEGER)
-                   (range 0 7)
-                   (default ?NONE)))
+(deffunction is-dead
+             (?symbol)
+             (send ?symbol is-dead))
+(deffunction is-alive
+             (?symbol)
+             (send ?symbol is-alive))
+(defmessage-handler cell is-dead primary
+                    ()
+                    (eq ?self:state dead))
+(defmessage-handler cell is-alive primary
+                    ()
+                    (eq ?self:state alive))
+
+
 (deftemplate stage
              (slot current
                    (type SYMBOL)
@@ -123,18 +133,10 @@
 (deftemplate neighbor-results
              (slot target
                    (default ?NONE))
-             (slot num-dead
-                   (type INTEGER)
-                   (default ?NONE))
              (slot num-alive
                    (type INTEGER)
                    (default ?NONE)))
-(deffunction is-dead
-             (?symbol)
-             (eq (send ?symbol get-state) dead))
-(deffunction is-alive
-             (?symbol)
-             (eq (send ?symbol get-state) alive))
+
 (defrule get-neighbors
          (stage (current generate-update))
          (object (is-a cell)
@@ -144,29 +146,29 @@
                  (name ?cell))
          =>
          (assert (neighbor-results (target ?cell)
-                                   (num-dead (count$ is-dead 
-                                                     ?neighbors))
                                    (num-alive (count$ is-alive 
                                                       ?neighbors)))))
-
+(deffunction in-display-range
+             (?index)
+             (<= ?*display-min* ?index ?*display-max*))
 (defrule update-pixels:dead
          (stage (current update-pixel))
          (object (is-a cell)
-                 (x ?x&:(<= ?*display-min* ?x ?*display-max*))
-                 (y ?y&:(<= ?*display-min* ?y ?*display-max*))
+                 (x ?x&:(in-display-range ?x))
+                 (y ?y&:(in-display-range ?y))
                  (state dead))
          =>
          (unicornhat:set-pixel-color (unicornhat:get-pixel-position ?x ?y)
-                                     0 0 0))
+                                     $?*dead-pixel*))
 (defrule update-pixels:alive
          (stage (current update-pixel))
          (object (is-a cell)
-                 (x ?x&:(<= ?*display-min* ?x ?*display-max*))
-                 (y ?y&:(<= ?*display-min* ?y ?*display-max*))
+                 (x ?x&:(in-display-range ?x))
+                 (y ?y&:(in-display-range ?y))
                  (state alive))
          =>
          (unicornhat:set-pixel-color (unicornhat:get-pixel-position ?x ?y)
-                                     128 0 128))
+                                     $?*live-pixel*))
 
 (defrule draw
          (stage (current draw))
@@ -254,14 +256,10 @@
          ; has to be done this way since sequence operators aren't valid in assertions
          (loop-for-count (?x ?*board-min* ?*board-max*) do
                          (loop-for-count (?y ?*board-min* ?*board-max*) do
-                                         (bind ?xm (n-1 ?x))
-                                         (bind ?xp (n+1 ?x))
-                                         (bind ?ym (n-1 ?y))
-                                         (bind ?yp (n+1 ?y))
                                          ; generate the values that make up the neighbors
                                          (assert (compute-neighbors ?x ?y
-                                                                    ?xm ?ym
-                                                                    ?xp ?yp))
+                                                                    (n-1 ?x) (n-1 ?y)
+                                                                    (n+1 ?x) (n+1 ?y)))
                                          (make-instance of cell 
                                                         (x ?x) 
                                                         (y ?y) 
