@@ -38,11 +38,11 @@
                                 restart)
            ; r g b
            ?*dead-pixel* = (create$ 0 0 0)
-           ?*live-pixel* = (create$ 128 0 128)
+           ?*live-pixel* = (create$ 128 128 128)
            ?*display-min* = 0
            ?*display-max* = 7
-           ?*board-min* = -10
-           ?*board-max* = 10)
+           ?*board-min* = ?*display-min*
+           ?*board-max* = ?*display-max*)
 
 (defgeneric n+1 
             "Gets the next cell with wraparound ")
@@ -253,6 +253,13 @@
          (unicornhat:set-brightness 50)
          (loop-for-count (?a 0 63) do
                          (unicornhat:set-pixel-color ?a 0 0 0))
+         (assert (stage (current update-constants)
+                        (rest build-board
+                              pre-compute
+                              ?*stages*))))
+(defrule build-board
+         (stage (current build-board))
+         =>
          ; has to be done this way since sequence operators aren't valid in assertions
          (loop-for-count (?x ?*board-min* ?*board-max*) do
                          (loop-for-count (?y ?*board-min* ?*board-max*) do
@@ -263,9 +270,7 @@
                                          (make-instance of cell 
                                                         (x ?x) 
                                                         (y ?y) 
-                                                        (state dead))))
-         (assert (stage (current pre-compute)
-                        (rest ?*stages*))))
+                                                        (state dead)))))
 (defrule apply-pixel
          (stage (current pre-compute))
          ?f <- (cell ?x ?y ?state)
@@ -327,3 +332,29 @@
                                         ?cell6 
                                         ?cell7 
                                         ?cell8)))
+(defrule modify-color-scheme:live-pixel
+         (stage (current update-constants))
+         ?f <- (live-pixel ?r ?g ?b)
+         =>
+         (retract ?f)
+         (bind ?*live-pixel* ?r ?g ?b))
+
+(defrule modify-color-scheme:dead-pixel
+         (stage (current update-constants))
+         ?f <- (dead-pixel ?r ?g ?b)
+         =>
+         (retract ?f)
+         (bind ?*dead-pixel* ?r ?g ?b))
+
+(defrule modify-board-max
+         (stage (current update-constants))
+         ?f <- (board-max ?v)
+         =>
+         (retract ?f)
+         (bind ?*board-max* ?v))
+(defrule modify-board-min
+         (stage (current update-constants))
+         ?f <- (board-min ?v)
+         =>
+         (retract ?f)
+         (bind ?*board-min* ?v))
