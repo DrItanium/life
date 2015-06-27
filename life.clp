@@ -35,7 +35,12 @@
                                 perhaps-terminate
                                 generate-update
                                 rules
-                                restart))
+                                restart)
+           ?*display-min* = 0
+           ?*display-max* = 7
+           ?*board-min* = -10
+           ?*board-max* = 10)
+
 (defgeneric n+1 
             "Gets the next cell with wraparound ")
 (defgeneric n-1
@@ -45,23 +50,23 @@
 
 
 (defmethod n+1
-  ((?n INTEGER (<= 0 (+ ?n 1) 7)))
+  ((?n INTEGER (<= ?*board-min* (+ ?n 1) ?*board-max*)))
   (+ ?n 1))
 (defmethod n+1
-  ((?n INTEGER (> (+ ?n 1) 7)))
-  0)
+  ((?n INTEGER (> (+ ?n 1) ?*board-max*)))
+  ?*board-min*)
 (defmethod n+1
-  ((?n INTEGER (< (+ ?n 1) 0)))
-  7)
+  ((?n INTEGER (< (+ ?n 1) ?*board-min*)))
+  ?*board-max*)
 (defmethod n-1
-  ((?n INTEGER (<= 0 (- ?n 1) 7)))
+  ((?n INTEGER (<= ?*board-min* (- ?n 1) ?*board-max*)))
   (- ?n 1))
 (defmethod n-1
-  ((?n INTEGER (> (- ?n 1) 7)))
-  0)
+  ((?n INTEGER (> (- ?n 1) ?*board-max*)))
+  ?*board-min*)
 (defmethod n-1
-  ((?n INTEGER (< (- ?n 1) 0)))
-  7)
+  ((?n INTEGER (< (- ?n 1) ?*board-min*)))
+  ?*board-max*)
 (defmethod count$
   ((?fn SYMBOL)
    (?elements MULTIFIELD))
@@ -88,7 +93,10 @@
   (slot y
         (type INTEGER)
         (range 0 7)
-        (default ?NONE)))
+        (default ?NONE))
+  (multislot neighbors
+             (type INSTANCE)
+             (allowed-classes cell)))
 
 (deftemplate pattern-cell
              (slot x
@@ -123,68 +131,29 @@
                    (default ?NONE)))
 (deffunction is-dead
              (?symbol)
-             (eq ?symbol dead))
+             (eq (send ?symbol get-state) dead))
 (deffunction is-alive
              (?symbol)
-             (eq ?symbol alive))
+             (eq (send ?symbol get-state) alive))
 (defrule get-neighbors
          (stage (current generate-update))
          (object (is-a cell)
                  (x ?x)
                  (y ?y)
-                 (name ?cell0))
-         (object (is-a cell)
-                 (x ?x)
-                 (y =(n+1 ?y))
-                 (state ?state1))
-         (object (is-a cell)
-                 (x ?x)
-                 (y =(n-1 ?y))
-                 (state ?state2))
-         (object (is-a cell)
-                 (x =(n+1 ?x))
-                 (y ?y)
-                 (state ?state3))
-         (object (is-a cell)
-                 (x =(n+1 ?x))
-                 (y =(n+1 ?y))
-                 (state ?state4))
-         (object (is-a cell)
-                 (x =(n+1 ?x))
-                 (y =(n-1 ?y))
-                 (state ?state5))
-         (object (is-a cell)
-                 (x =(n-1 ?x))
-                 (y ?y)
-                 (state ?state6))
-         (object (is-a cell)
-                 (x =(n-1 ?x))
-                 (y =(n+1 ?y))
-                 (state ?state7))
-         (object (is-a cell)
-                 (x =(n-1 ?x))
-                 (y =(n-1 ?y))
-                 (state ?state8))
+                 (neighbors $?neighbors)
+                 (name ?cell))
          =>
-         (bind ?states (create$ ?state1 
-                                ?state2 
-                                ?state3 
-                                ?state4 
-                                ?state5 
-                                ?state6 
-                                ?state7 
-                                ?state8))
-         (assert (neighbor-results (target ?cell0)
+         (assert (neighbor-results (target ?cell)
                                    (num-dead (count$ is-dead 
-                                                     ?states))
+                                                     ?neighbors))
                                    (num-alive (count$ is-alive 
-                                                      ?states)))))
+                                                      ?neighbors)))))
 
 (defrule update-pixels:dead
          (stage (current update-pixel))
          (object (is-a cell)
-                 (x ?x)
-                 (y ?y)
+                 (x ?x&:(<= ?*display-min* ?x ?*display-max*))
+                 (y ?y&:(<= ?*display-min* ?y ?*display-max*))
                  (state dead))
          =>
          (unicornhat:set-pixel-color (unicornhat:get-pixel-position ?x ?y)
@@ -192,8 +161,8 @@
 (defrule update-pixels:alive
          (stage (current update-pixel))
          (object (is-a cell)
-                 (x ?x)
-                 (y ?y)
+                 (x ?x&:(<= ?*display-min* ?x ?*display-max*))
+                 (y ?y&:(<= ?*display-min* ?y ?*display-max*))
                  (state alive))
          =>
          (unicornhat:set-pixel-color (unicornhat:get-pixel-position ?x ?y)
@@ -263,8 +232,7 @@
                       (rest $?rest))
          =>
          (bind ?new-stage (expand$ (first$ ?*stages*)))
-         (bind ?contents (create$ (rest$ ?*stages*)
-                                  ?rest))
+         (bind ?contents (rest$ ?*stages*) ?rest)
          (modify ?f (current ?new-stage)
                  (rest ?contents)))
 
@@ -283,7 +251,69 @@
          (unicornhat:set-brightness 50)
          (loop-for-count (?a 0 63) do
                          (unicornhat:set-pixel-color ?a 0 0 0))
-         (bind ?target (expand$ (first$ ?*stages*)))
-         (bind ?rest (rest$ ?*stages*))
-         (assert (stage (current ?target)
-                        (rest ?rest))))
+         ; has to be done this way since sequence operators aren't valid in assertions
+         (loop-for-count (?x ?*board-min* ?*board-max*) do
+                         (loop-for-count (?y ?*board-min* ?*board-max*) do
+                                         (make-instance of cell 
+                                                        (x ?x) 
+                                                        (y ?y) 
+                                                        (state dead))))
+         (assert (stage (current pre-compute)
+                        (rest ?*stages*))))
+(defrule apply-pixel
+         (stage (current pre-compute))
+         ?f <- (cell ?x ?y ?state)
+         ?cell <- (object (is-a cell) 
+                          (x ?x) 
+                          (y ?y))
+         =>
+         (retract ?f)
+         (modify-instance ?cell (state ?state)))
+
+(defrule compute-neighbors
+         "Collects the set of neighbors for a given cell and stores it in that cell"
+         (stage (current pre-compute))
+         ?c <- (object (is-a cell)
+                       (x ?x)
+                       (y ?y))
+         (object (is-a cell)
+                 (x ?x)
+                 (y =(n+1 ?y))
+                 (name ?cell1))
+         (object (is-a cell)
+                 (x ?x)
+                 (y =(n-1 ?y))
+                 (name ?cell2))
+         (object (is-a cell)
+                 (x =(n+1 ?x))
+                 (y ?y)
+                 (name ?cell3))
+         (object (is-a cell)
+                 (x =(n+1 ?x))
+                 (y =(n+1 ?y))
+                 (name ?cell4))
+         (object (is-a cell)
+                 (x =(n+1 ?x))
+                 (y =(n-1 ?y))
+                 (name ?cell5))
+         (object (is-a cell)
+                 (x =(n-1 ?x))
+                 (y ?y)
+                 (name ?cell6))
+         (object (is-a cell)
+                 (x =(n-1 ?x))
+                 (y =(n+1 ?y))
+                 (name ?cell7))
+         (object (is-a cell)
+                 (x =(n-1 ?x))
+                 (y =(n-1 ?y))
+                 (name ?cell8))
+         =>
+         (modify-instance ?c (neighbors ?cell1 
+                                        ?cell2 
+                                        ?cell3 
+                                        ?cell4 
+                                        ?cell5 
+                                        ?cell6 
+                                        ?cell7 
+                                        ?cell8)))

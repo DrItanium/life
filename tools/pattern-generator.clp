@@ -29,12 +29,12 @@
   ((?board-name SYMBOL)
    (?infile SYMBOL)
    (?outfile SYMBOL))
-  (printout ?outfile "(definstances " ?board-name crlf)
+  (printout ?outfile "(deffacts " ?board-name crlf)
   (loop-for-count (?x 0 7) do
                   (loop-for-count (?y 0 7) do
                                   (bind ?result (read ?infile))
                                   (format ?outfile 
-                                          "(of cell (x %d) (y %d) (state %s))%n"
+                                          "(cell %d %d %s)%n"
                                           ?x
                                           ?y
                                           (if (eq ?result +) then alive else dead))))
