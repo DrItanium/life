@@ -5,5 +5,5 @@ if [ $# -eq 0 ]; then
 else
     pattern=$1
     shift
-    maya-unicornhat -f2 life.clp -f2 $pattern $@ -f2 fragments/reset-run-exit.clp
+    maya-unicornhat -f2 src/life.clp -f2 $pattern $@ -f2 src/fragments/reset-run-exit.clp
 fi
